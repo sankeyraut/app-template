@@ -1,3 +1,5 @@
+CREATE DATABASE keycloak;
+
 CREATE TABLE IF NOT EXISTS jokes (
     id SERIAL PRIMARY KEY,
     content TEXT NOT NULL

@@ -1,0 +1,44 @@
+{
+    "realm": "antigravity",
+    "enabled": true,
+    "users": [
+        {
+            "username": "sanket",
+            "enabled": true,
+            "emailVerified": true,
+            "firstName": "Sanket",
+            "lastName": "User",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password",
+                    "temporary": false
+                }
+            ]
+        }
+    ],
+    "roles": {
+        "realm": [
+            {
+                "name": "user",
+                "description": "User role"
+            }
+        ]
+    },
+    "clients": [
+        {
+            "clientId": "hello-client",
+            "enabled": true,
+            "publicClient": true,
+            "directAccessGrantsEnabled": true,
+            "rootUrl": "http://localhost:8080",
+            "baseUrl": "http://localhost:8080",
+            "redirectUris": [
+                "http://localhost:8080/*"
+            ],
+            "webOrigins": [
+                "*"
+            ]
+        }
+    ]
+}
