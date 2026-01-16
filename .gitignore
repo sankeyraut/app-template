@@ -1,0 +1,15 @@
+# Rust
+target/
+**/*.rs.bk
+
+# Node/Frontend
+node_modules/
+dist/
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+
+# Brain/Artifacts (optional, but good practice to ignore agent artifacts if not wanted in repo)
+brain/

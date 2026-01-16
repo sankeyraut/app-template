@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  hello_app:
+    image: hello_actix_img
+    build: ./hello_actix
+    container_name: hello_app
+    ports:
+      - "9876:9876"
+    depends_on:
+      - db
+      - cache
+    environment:
+      - DATABASE_URL=postgres://user:password@db:5432/jokes_db
+      - REDIS_URL=redis://cache:6379
+    networks:
+      - app_network
+
+  frontend:
+    image: hello_frontend_img
+    build: ./hello_frontend
+    container_name: hello_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - hello_app
+    networks:
+      - app_network
+
+  db:
+    image: postgres:15-alpine
+    container_name: jokes_db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: jokes_db
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app_network
+
+  cache:
+    image: valkey/valkey:latest
+    container_name: jokes_cache
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
