@@ -14,10 +14,10 @@ FROM debian:bookworm-slim
 # Install necessary runtime dependencies (if any, usually none for simple actix app but ca-certificates is good practice)
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/local/cargo/bin/hello_actix /usr/local/bin/hello_actix
+COPY --from=builder /usr/local/cargo/bin/app-template-backend /usr/local/bin/app-template-backend
 
 # Expose the port
 EXPOSE 9876
 
 # Run the binary
-CMD ["hello_actix"]
+CMD ["app-template-backend"]

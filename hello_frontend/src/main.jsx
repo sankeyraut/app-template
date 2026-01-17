@@ -5,7 +5,7 @@ import App from './App.jsx'
 import { AuthProvider } from "react-oidc-context";
 
 const oidcConfig = {
-  authority: "http://localhost:8180/realms/antigravity",
+  authority: "http://localhost:8180/realms/app-template",
   client_id: "hello-client",
   redirect_uri: window.location.origin,
   onSigninCallback: () => {

@@ -1,5 +1,6 @@
 {
-    "realm": "antigravity",
+    "id": "app-template",
+    "realm": "app-template",
     "enabled": true,
     "users": [
         {

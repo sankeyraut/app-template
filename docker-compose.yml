@@ -1,35 +1,36 @@
 version: '3.8'
 
 services:
-  hello_app:
-    image: hello_actix_img
+  app_backend:
+    image: app_backend_img
     build: ./hello_actix
-    container_name: hello_app
+    container_name: app_backend
     ports:
       - "9876:9876"
     depends_on:
-      - db
-      - cache
+      - app_db
+      - app_cache
     environment:
-      - DATABASE_URL=postgres://user:password@db:5432/jokes_db
-      - REDIS_URL=redis://cache:6379
+      - DATABASE_URL=postgres://user:password@app_db:5432/jokes_db
+      - REDIS_URL=redis://app_cache:6379
+      - OIDC_JWKS=http://keycloak:8080/realms/app-template/protocol/openid-connect/certs
     networks:
       - app_network
 
-  frontend:
-    image: hello_frontend_img
+  app_frontend:
+    image: app_frontend_img
     build: ./hello_frontend
-    container_name: hello_frontend
+    container_name: app_frontend
     ports:
       - "8080:80"
     depends_on:
-      - hello_app
+      - app_backend
     networks:
       - app_network
 
-  db:
+  app_db:
     image: postgres:15-alpine
-    container_name: jokes_db
+    container_name: app_db
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
@@ -39,9 +40,9 @@ services:
     networks:
       - app_network
 
-  cache:
+  app_cache:
     image: valkey/valkey:latest
-    container_name: jokes_cache
+    container_name: app_cache
     networks:
       - app_network
 
@@ -50,7 +51,7 @@ services:
     container_name: keycloak
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://db:5432/keycloak
+      KC_DB_URL: jdbc:postgresql://app_db:5432/keycloak
       KC_DB_USERNAME: user
       KC_DB_PASSWORD: password
       KEYCLOAK_ADMIN: admin
@@ -58,7 +59,7 @@ services:
     ports:
       - "8180:8080"
     depends_on:
-      - db
+      - app_db
     networks:
       - app_network
 

@@ -138,7 +138,7 @@ async fn main() -> std::io::Result<()> {
     // Auth Config
     // let issuer = std::env::var("OIDC_ISSUER").unwrap_or_else(|_| "http://keycloak:8080/realms/antigravity".to_string());
     // JWKS URI: http://keycloak:8080/realms/antigravity/protocol/openid-connect/certs
-    let jwks_uri = std::env::var("OIDC_JWKS").unwrap_or_else(|_| "http://keycloak:8080/realms/antigravity/protocol/openid-connect/certs".to_string());
+    let jwks_uri = std::env::var("OIDC_JWKS").unwrap_or_else(|_| "http://keycloak:8080/realms/app-template/protocol/openid-connect/certs".to_string());
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
