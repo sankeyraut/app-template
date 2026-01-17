@@ -13,14 +13,24 @@ graph TD
     Frontend -->|Auth Redirect| Keycloak(Keycloak IdP)
     Backend -->|Validate Token| Keycloak
     Backend -->|Read/Write| DB[(PostgreSQL)]
-    Backend -->|Cache| Cache[(Valkey/Redis)]
+    Backend -->|Real-time Ranking| Cache[(Valkey/Redis)]
+    Backend -->|Leaderboard Logic| Cache
 ```
 
 *   **Frontend**: React (Vite) served by Nginx. Acts as a reverse proxy for API requests.
 *   **Backend**: Rust (Actix Web). High-performance asynchronous API.
 *   **Authentication**: Keycloak (OIDC). Handles user identity and access management.
-*   **Database**: PostgreSQL. Persistent relational data storage.
-*   **Cache**: Valkey (Redis). In-memory data structure store for caching.
+*   **Database**: PostgreSQL. Persistent relational data storage for jokes and leaderboard high scores.
+*   **Cache**: Valkey (Redis). In-memory data structure store used for caching jokes and real-time leaderboard ranking (Sorted Sets).
+
+## 🎮 Game Features
+
+### 🏆 Global Leaderboard
+The application includes a real-time leaderboard system:
+*   **High Score Logic**: Only the highest score for each user is preserved.
+*   **Real-time Ranking**: Powered by Valkey's `ZSET` (Sorted Sets) for O(log(N)) performance.
+*   **Persistence**: All scores are backed up in PostgreSQL to ensure data durability.
+*   **Hall of Fame**: A premium UI component showcasing the top 10 champions with custom medals.
 
 ## 🚀 Getting Started
 
@@ -60,6 +70,7 @@ This template supports running multiple independent environments on the same mac
 ### Accessing the Application
 *   **Frontend**: `http://localhost:${FRONTEND_PORT}`
 *   **Keycloak Admin**: `http://localhost:${KEYCLOAK_PORT}`
+*   **Test Users**: 10 pre-configured players (`player1` through `player10`) are available in the default realm. All use the password `password`.
 
 ### Stopping a Sandbox
 
