@@ -16,3 +16,11 @@ INSERT INTO jokes (content) VALUES
 ('What is the most used language in programming? Profanity.'),
 ('Knock, knock. Who''s there? Recursion. Recursion who? Knock, knock.'),
 ('There are 10 types of people in the world: those who understand binary, and those who don''t.');
+
+CREATE TABLE IF NOT EXISTS leaderboard (
+    user_id VARCHAR(255) PRIMARY KEY,
+    username VARCHAR(255),
+    score INT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+

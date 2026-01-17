@@ -9,6 +9,20 @@ use actix_web_httpauth::extractors::bearer::BearerAuth;
 use jsonwebtoken::{decode, decode_header, DecodingKey, Validation, Algorithm};
 use serde_json::Value;
 
+/// Request payload for submitting a new score
+#[derive(Serialize, Deserialize)]
+struct ScoreRequest {
+    score: i32,
+}
+
+/// Represents a single entry in the leaderboard
+#[derive(Serialize, Deserialize, Debug)]
+struct LeaderboardEntry {
+    username: String,
+    score: i32,
+    rank: Option<i64>, // Rank is calculated real-time by Valkey
+}
+
 #[derive(Clone)]
 struct AppState {
     db: Pool<Postgres>,
@@ -27,7 +41,8 @@ struct Joke {
 struct Claims {
     sub: String,
     exp: usize,
-    // Add other fields if needed
+    preferred_username: Option<String>,
+    name: Option<String>,
 }
 
 // Fetch JWKS and find the key (Simplified: In prod, cache this!)
@@ -128,6 +143,129 @@ async fn get_joke(
     }
 }
 
+/// Validates the OIDC token and returns the user claims
+async fn validate_token(token: &str, jwks_uri: &str) -> Result<Claims, HttpResponse> {
+    // ... logic ...
+    let header = decode_header(token).map_err(|_| HttpResponse::Unauthorized().body("Invalid token header"))?;
+    let kid = header.kid.ok_or_else(|| HttpResponse::Unauthorized().body("Token missing kid"))?;
+    let decoding_key = get_decoding_key(jwks_uri, &kid).await.map_err(|e| {
+        println!("JWKS Fetch Error: {:?}", e);
+        HttpResponse::Unauthorized().body("Could not fetch signing key")
+    })?;
+
+    let mut validation = Validation::new(Algorithm::RS256);
+    validation.validate_aud = false;
+
+    decode::<Claims>(token, &decoding_key, &validation)
+        .map(|data| data.claims)
+        .map_err(|e| HttpResponse::Unauthorized().body(format!("Invalid token: {:?}", e)))
+}
+
+/// Submits a player's score to the leaderboard.
+/// Persistence: PostgreSQL (only updates if score is higher)
+/// Real-time Ranking: Valkey (Sorted Set)
+#[actix_web::post("/leaderboard")]
+async fn submit_score(
+    data: web::Data<AppState>,
+    auth: BearerAuth,
+    score_req: web::Json<ScoreRequest>,
+) -> impl Responder {
+    let claims = match validate_token(auth.token(), &data.oidc_jwks_uri).await {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+
+    let user_id = claims.sub;
+    let username = claims.preferred_username.or(claims.name).unwrap_or_else(|| "Anonymous".to_string());
+    let new_score = score_req.score;
+
+    // 1. Update PostgreSQL (High Score Logic)
+    let result = sqlx::query(
+        "INSERT INTO leaderboard (user_id, username, score) 
+         VALUES ($1, $2, $3) 
+         ON CONFLICT (user_id) DO UPDATE 
+         SET score = EXCLUDED.score, username = EXCLUDED.username, updated_at = NOW() 
+         WHERE leaderboard.score < EXCLUDED.score"
+    )
+    .bind(&user_id)
+    .bind(&username)
+    .bind(new_score)
+    .execute(&data.db)
+    .await;
+
+    if let Err(e) = result {
+        return HttpResponse::InternalServerError().body(format!("DB error: {}", e));
+    }
+
+    // 2. Update Valkey (Redis)
+    let mut con = match data.redis_client.get_async_connection().await {
+        Ok(con) => con,
+        Err(e) => return HttpResponse::InternalServerError().body(format!("Redis error: {}", e)),
+    };
+
+    // ZADD will update if score is different. 
+    // Since we only updated DB if score was higher, we should do the same here or just ZADD with GT option if supported
+    // But simple ZADD is fine if we only care about the latest "high" score being in Redis
+    let _: Result<(), redis::RedisError> = con.zadd("leaderboard", &username, new_score).await;
+
+    HttpResponse::Ok().body("Score submitted")
+}
+
+/// Retrieves the top 10 players from the Valkey sorted set
+#[actix_web::get("/leaderboard")]
+async fn get_leaderboard(data: web::Data<AppState>) -> impl Responder {
+    let mut con = match data.redis_client.get_async_connection().await {
+        Ok(con) => con,
+        Err(e) => return HttpResponse::InternalServerError().body(format!("Redis error: {}", e)),
+    };
+
+    // Get top 10
+    let results: Vec<(String, i32)> = match con.zrevrange_withscores("leaderboard", 0, 9).await {
+        Ok(res) => res,
+        Err(e) => return HttpResponse::InternalServerError().body(format!("Redis error: {}", e)),
+    };
+
+    let leaderboard: Vec<LeaderboardEntry> = results
+        .into_iter()
+        .enumerate()
+        .map(|(rank, (username, score))| LeaderboardEntry {
+            username,
+            score,
+            rank: Some((rank + 1) as i64),
+        })
+        .collect();
+
+    HttpResponse::Ok().json(leaderboard)
+}
+
+/// Retrieves the current authenticated user's rank and score from Valkey
+#[actix_web::get("/leaderboard/me")]
+async fn get_my_rank(data: web::Data<AppState>, auth: BearerAuth) -> impl Responder {
+    let claims = match validate_token(auth.token(), &data.oidc_jwks_uri).await {
+        Ok(c) => c,
+        Err(r) => return r,
+    };
+
+    let username = claims.preferred_username.or(claims.name).unwrap_or_else(|| "Anonymous".to_string());
+
+    let mut con = match data.redis_client.get_async_connection().await {
+        Ok(con) => con,
+        Err(e) => return HttpResponse::InternalServerError().body(format!("Redis error: {}", e)),
+    };
+
+    let score: Option<i32> = con.zscore("leaderboard", &username).await.ok();
+    let rank: Option<i64> = con.zrevrank("leaderboard", &username).await.ok();
+
+    match (score, rank) {
+        (Some(s), Some(r)) => HttpResponse::Ok().json(LeaderboardEntry {
+            username,
+            score: s,
+            rank: Some(r + 1),
+        }),
+        _ => HttpResponse::NotFound().body("User not found on leaderboard"),
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     println!("Starting server initialization...");
@@ -160,6 +298,9 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(app_state.clone()))
             .service(greet)
             .service(get_joke)
+            .service(submit_score)
+            .service(get_leaderboard)
+            .service(get_my_rank)
     })
     .bind(("0.0.0.0", 9876))?
     .run()

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import './App.css'
 import { useAuth } from "react-oidc-context";
+import Leaderboard from './Leaderboard';
 
 function App() {
   const auth = useAuth();
@@ -96,6 +97,7 @@ function App() {
           )}
         </div>
       )}
+      <Leaderboard auth={auth} />
     </div>
   )
 }
