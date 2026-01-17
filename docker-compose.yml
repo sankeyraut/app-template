@@ -1,36 +1,36 @@
-version: '3.8'
-
 services:
   app_backend:
     image: app_backend_img
     build: ./hello_actix
-    container_name: app_backend
+    container_name: ${SANDBOX_NAME:-app}-backend
     ports:
-      - "9876:9876"
+      - "${BACKEND_PORT:-9876}:9876"
     depends_on:
       - app_db
       - app_cache
     environment:
       - DATABASE_URL=postgres://user:password@app_db:5432/jokes_db
       - REDIS_URL=redis://app_cache:6379
-      - OIDC_JWKS=http://keycloak:8080/realms/app-template/protocol/openid-connect/certs
+      - OIDC_JWKS=http://keycloak:8080/realms/${REALM_NAME:-app-template}/protocol/openid-connect/certs
     networks:
       - app_network
 
   app_frontend:
     image: app_frontend_img
     build: ./hello_frontend
-    container_name: app_frontend
+    container_name: ${SANDBOX_NAME:-app}-frontend
     ports:
-      - "8080:80"
+      - "${FRONTEND_PORT:-8080}:80"
     depends_on:
       - app_backend
+    environment:
+      - KEYCLOAK_URL=http://localhost:${KEYCLOAK_PORT:-8180}/realms/${REALM_NAME:-app-template}
     networks:
       - app_network
 
   app_db:
     image: postgres:15-alpine
-    container_name: app_db
+    container_name: ${SANDBOX_NAME:-app}-db
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
@@ -42,22 +42,27 @@ services:
 
   app_cache:
     image: valkey/valkey:latest
-    container_name: app_cache
+    container_name: ${SANDBOX_NAME:-app}-cache
     networks:
       - app_network
 
   keycloak:
-    build: ./keycloak
-    container_name: keycloak
+    build: 
+      context: ./keycloak
+      args:
+        - FRONTEND_URL=http://localhost:${FRONTEND_PORT:-8080}
+        - REALM_NAME=${REALM_NAME:-app-template}
+    container_name: ${SANDBOX_NAME:-app}-keycloak
     environment:
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://app_db:5432/keycloak
-      KC_DB_USERNAME: user
-      KC_DB_PASSWORD: password
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://app_db:5432/keycloak
+      - KC_DB_USERNAME=user
+      - KC_DB_PASSWORD=password
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - FRONTEND_URL=http://localhost:${FRONTEND_PORT:-8080}
     ports:
-      - "8180:8080"
+      - "${KEYCLOAK_PORT:-8180}:8080"
     depends_on:
       - app_db
     networks:

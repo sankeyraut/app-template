@@ -1,6 +1,6 @@
 {
-    "id": "app-template",
-    "realm": "app-template",
+    "id": "${REALM_NAME}",
+    "realm": "${REALM_NAME}",
     "enabled": true,
     "users": [
         {
@@ -32,10 +32,10 @@
             "enabled": true,
             "publicClient": true,
             "directAccessGrantsEnabled": true,
-            "rootUrl": "http://localhost:8080",
-            "baseUrl": "http://localhost:8080",
+            "rootUrl": "${FRONTEND_URL}",
+            "baseUrl": "${FRONTEND_URL}",
             "redirectUris": [
-                "http://localhost:8080/*"
+                "${FRONTEND_URL}/*"
             ],
             "webOrigins": [
                 "*"
