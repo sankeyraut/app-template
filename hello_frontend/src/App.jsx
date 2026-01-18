@@ -6,141 +6,129 @@ import XandZeroGame from './XandZeroGame';
 
 function App() {
   const auth = useAuth();
-  const [name, setName] = useState('')
-  const [response, setResponse] = useState('')
-  const [joke, setJoke] = useState('')
-  const [showGame, setShowGame] = useState(false);
+  const [view, setView] = useState('hub'); // 'hub', 'xandzero', 'jokes'
+  const [joke, setJoke] = useState('');
+  const [loadingJoke, setLoadingJoke] = useState(false);
   const [leaderboardKey, setLeaderboardKey] = useState(0);
 
+  const fetchJoke = async () => {
+    if (!auth.isAuthenticated) return;
+    setLoadingJoke(true);
+    try {
+      const res = await fetch('/api/joke', {
+        headers: { Authorization: `Bearer ${auth.user.access_token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setJoke(data.content);
+      } else {
+        setJoke('Failed to fetch joke.');
+      }
+    } catch (err) {
+      setJoke('Error fetching joke.');
+    } finally {
+      setLoadingJoke(false);
+    }
+  };
+
   const handleGameEnd = () => {
-    // Refresh leaderboard by changing key
     setLeaderboardKey(prev => prev + 1);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!name) return
-
-    try {
-      // 1. Fetch Hello (Public)
-      const resHello = await fetch(`/api/hello/${name}`)
-      const textHello = await resHello.text()
-      setResponse(textHello)
-
-      // 2. Fetch Joke (Protected) - Only if logged in
-      if (auth.isAuthenticated) {
-        const resJoke = await fetch(`/api/joke`, {
-          headers: {
-            Authorization: `Bearer ${auth.user.access_token}`
-          }
-        })
-        if (resJoke.ok) {
-          const jokeData = await resJoke.json()
-          setJoke(jokeData.content)
-        } else {
-          console.error(resJoke)
-          setJoke('Failed to fetch joke (Status: ' + resJoke.status + ')')
-        }
-      } else {
-        setJoke('Login to see a joke!')
-      }
-
-    } catch (error) {
-      console.error('Error fetching data:', error)
-      setResponse('Error connecting to server')
-      setJoke('')
-    }
-  }
-
   if (auth.isLoading) {
-    return <div>Loading Auth...</div>;
+    return <div className="loading-container">Loading Auth...</div>;
   }
 
   if (auth.error) {
-    return <div>Oops... {auth.error.message}</div>;
+    return <div className="error-container">Oops... {auth.error.message}</div>;
   }
+
+  const FeatureHub = () => (
+    <div className="hub-grid animate-fade-in">
+      <div className="feature-card" onClick={() => setView('xandzero')}>
+        <div className="card-icon">🎮</div>
+        <h3 className="card-title">X and Zero</h3>
+        <p className="card-desc">Classic & Sudden Death Tic-Tac-Toe with Power-ups.</p>
+      </div>
+      <div className="feature-card" onClick={() => { setView('jokes'); fetchJoke(); }}>
+        <div className="card-icon">🎭</div>
+        <h3 className="card-title">Daily Jokes</h3>
+        <p className="card-desc">Get your daily dose of fiber... I mean, humor.</p>
+      </div>
+    </div>
+  );
+
+  const JokesView = () => (
+    <div className="jokes-container animate-fade-in" style={{ padding: '2rem', background: 'rgba(255,255,255,0.03)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.1)', maxWidth: '600px', margin: '2rem auto' }}>
+      <h2 style={{ color: '#a855f7', marginBottom: '1.5rem' }}>🎭 Daily Jokes</h2>
+      {loadingJoke ? (
+        <p>Fetching humor...</p>
+      ) : (
+        <p style={{ fontSize: '1.4rem', fontStyle: 'italic', lineHeight: '1.6', margin: '2rem 0' }}>"{joke}"</p>
+      )}
+      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+        <button onClick={fetchJoke} disabled={loadingJoke}>Another One!</button>
+        <button onClick={() => setView('hub')} style={{ background: 'rgba(255,255,255,0.05)' }}>Back to Hub</button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="App">
-      <div style={{ position: 'absolute', top: '2rem', right: '2rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-        {auth.isAuthenticated && (
+      <div className="header-nav" style={{ position: 'absolute', top: '2rem', right: '2rem', display: 'flex', gap: '1rem', alignItems: 'center', zIndex: 100 }}>
+        {auth.isAuthenticated && view !== 'hub' && (
           <button
-            onClick={() => setShowGame(!showGame)}
+            onClick={() => setView('hub')}
             style={{
               background: 'rgba(255, 255, 255, 0.1)',
               border: '1px solid rgba(255, 255, 255, 0.2)',
               borderRadius: '50%',
-              width: '50px',
-              height: '50px',
-              fontSize: '1.5rem',
+              width: '45px',
+              height: '45px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              boxShadow: showGame ? '0 0 15px rgba(99, 102, 241, 0.5)' : 'none'
+              cursor: 'pointer'
             }}
-            title="Play X and Zero"
+            title="Back to Hub"
           >
-            {showGame ? '🏠' : '🎮'}
+            🏠
           </button>
         )}
         {auth.isAuthenticated ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.5rem 1rem', borderRadius: '30px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255, 255, 255, 0.05)', padding: '0.4rem 1rem', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.1)' }}>
             <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>{auth.user?.profile.preferred_username}</span>
-            <button onClick={() => auth.removeUser()} style={{ padding: '0.3rem 0.8rem', fontSize: '0.8rem' }}>Sign out</button>
+            <button onClick={() => auth.removeUser()} style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)' }}>Sign out</button>
           </div>
         ) : (
-          <button onClick={() => auth.signinRedirect()}>Sign in</button>
+          <button onClick={() => auth.signinRedirect()} style={{ background: '#6366f1', color: 'white' }}>Sign in</button>
         )}
       </div>
 
-      <h1 style={{ marginTop: '4rem', background: 'linear-gradient(to right, #60a5fa, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-        Hello Actix & React
+      <h1 className="animate-fade-in" style={{ marginTop: '5rem', background: 'linear-gradient(to right, #60a5fa, #a855f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', transition: 'all 0.5s ease' }}>
+        Game Hub
       </h1>
 
-      {showGame && auth.isAuthenticated ? (
-        <XandZeroGame auth={auth} onGameEnd={handleGameEnd} />
-      ) : (
-        <>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', marginTop: '2rem' }}>
-            <div>
-              <label htmlFor="name-input" style={{ marginRight: '0.5rem' }}>Name:</label>
-              <input
-                id="name-input"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter your name"
-                style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', background: 'rgba(255,255,255,0.05)', color: 'white' }}
-              />
-            </div>
-            <button type="submit" style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}>
-              Get Greeting & Joke
-            </button>
-          </form>
-          {response && (
-            <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ padding: '1rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}>
-                <h2>Greeting (Public):</h2>
-                <p>{response}</p>
-              </div>
-              {joke && (
-                <div style={{ padding: '1rem', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', backgroundColor: 'rgba(255,255,255,0.05)', color: '#eee' }}>
-                  <h2>Random Joke (Protected):</h2>
-                  <p style={{ fontStyle: 'italic' }}>"{joke}"</p>
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
+      <main style={{ minHeight: '500px' }}>
+        {!auth.isAuthenticated ? (
+          <div className="welcome-hero animate-fade-in" style={{ marginTop: '4rem' }}>
+            <p style={{ color: '#94a3b8', fontSize: '1.2rem' }}>Experience the future of web gaming. Sign in to unlock all features.</p>
+            <button onClick={() => auth.signinRedirect()} style={{ marginTop: '2rem', padding: '1rem 2.5rem', fontSize: '1.2rem', background: '#6366f1' }}>Get Started</button>
+          </div>
+        ) : (
+          <>
+            {view === 'hub' && <FeatureHub />}
+            {view === 'xandzero' && <XandZeroGame auth={auth} onGameEnd={handleGameEnd} />}
+            {view === 'jokes' && <JokesView />}
+          </>
+        )}
+      </main>
 
-      <div style={{ marginTop: '4rem' }}>
+      <div style={{ marginTop: '6rem', opacity: 0.8 }}>
         <Leaderboard key={leaderboardKey} auth={auth} />
       </div>
     </div>
-  )
+  );
 }
 
 export default App

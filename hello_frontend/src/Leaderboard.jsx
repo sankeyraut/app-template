@@ -12,9 +12,6 @@ import { useState, useEffect } from 'react';
 const Leaderboard = ({ auth }) => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [myRank, setMyRank] = useState(null);
-  const [scoreToSubmit, setScoreToSubmit] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const fetchLeaderboard = async () => {
     try {
@@ -42,35 +39,6 @@ const Leaderboard = ({ auth }) => {
       }
     } catch (e) {
       console.error('Failed to fetch my rank', e);
-    }
-  };
-
-  const submitScore = async () => {
-    if (!auth.isAuthenticated) {
-      setError('Login to submit score!');
-      return;
-    }
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch('/api/leaderboard', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${auth.user.access_token}`
-        },
-        body: JSON.stringify({ score: parseInt(scoreToSubmit) })
-      });
-      if (res.ok) {
-        await fetchLeaderboard();
-        await fetchMyRank();
-      } else {
-        setError('Failed to submit score');
-      }
-    } catch (e) {
-      setError('Error submitting score');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -184,48 +152,7 @@ const Leaderboard = ({ auth }) => {
                 <p style={{ margin: '0.5rem 0 0', color: '#94a3b8' }}>You haven't stepped onto the field yet.</p>
               )}
             </div>
-
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="number"
-                  value={scoreToSubmit}
-                  onChange={(e) => setScoreToSubmit(e.target.value)}
-                  style={{
-                    padding: '0.75rem 1rem',
-                    width: '120px',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    color: '#f8fafc',
-                    outline: 'none',
-                    fontSize: '1rem'
-                  }}
-                  placeholder="Score"
-                />
-              </div>
-              <button
-                onClick={submitScore}
-                disabled={loading}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '12px',
-                  background: 'linear-gradient(to right, #6366f1, #a855f7)',
-                  color: 'white',
-                  border: 'none',
-                  fontWeight: '600',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'opacity 0.2s, transform 0.2s',
-                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
-                }}
-                onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
-                onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-              >
-                {loading ? 'Transmitting...' : 'Submit Score'}
-              </button>
-            </div>
           </div>
-          {error && <p style={{ color: '#ef4444', marginTop: '1rem', fontSize: '0.875rem' }}>⚠️ {error}</p>}
         </div>
       ) : (
         <div style={{ marginTop: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem' }}>
