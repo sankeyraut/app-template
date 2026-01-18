@@ -24,7 +24,7 @@ services:
     depends_on:
       - app_backend
     environment:
-      - KEYCLOAK_URL=http://localhost:${KEYCLOAK_PORT:-8180}/realms/${REALM_NAME:-app-template}
+      - KEYCLOAK_URL=http://localhost:${FRONTEND_PORT:-8080}/realms/${REALM_NAME:-app-template}
     networks:
       - app_network
 
@@ -60,8 +60,9 @@ services:
       - KC_DB_PASSWORD=password
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
-      - FRONTEND_URL=http://localhost:${FRONTEND_PORT:-8080}
-      - KC_HOSTNAME=${KEYCLOAK_EXTERNAL_HOSTNAME:-localhost}
+      - KC_PROXY=edge
+      - KC_HOSTNAME_URL=http://localhost:${FRONTEND_PORT:-8080}
+      - KC_HOSTNAME_ADMIN_URL=http://localhost:${FRONTEND_PORT:-8080}
       - KC_HOSTNAME_STRICT=false
     ports:
       - "${KEYCLOAK_PORT:-8180}:8080"
