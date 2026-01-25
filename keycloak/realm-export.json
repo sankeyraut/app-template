@@ -17,16 +17,126 @@
                 }
             ]
         },
-        { "username": "player1", "enabled": true, "firstName": "Player", "lastName": "One", "credentials": [{ "type": "password", "value": "password" }] },
-        { "username": "player2", "enabled": true, "firstName": "Player", "lastName": "Two", "credentials": [{ "type": "password", "value": "password" }] },
-        { "username": "player3", "enabled": true, "firstName": "Player", "lastName": "Three", "credentials": [{ "type": "password", "value": "password" }] },
-        { "username": "player4", "enabled": true, "firstName": "Player", "lastName": "Four", "credentials": [{ "type": "password", "value": "password" }] },
-        { "username": "player5", "enabled": true, "firstName": "Player", "lastName": "Five", "credentials": [{ "type": "password", "value": "password" }] },
-        { "username": "player6", "enabled": true, "firstName": "Player", "lastName": "Six", "credentials": [{ "type": "password", "value": "password" }] },
-        { "username": "player7", "enabled": true, "firstName": "Player", "lastName": "Seven", "credentials": [{ "type": "password", "value": "password" }] },
-        { "username": "player8", "enabled": true, "firstName": "Player", "lastName": "Eight", "credentials": [{ "type": "password", "value": "password" }] },
-        { "username": "player9", "enabled": true, "firstName": "Player", "lastName": "Nine", "credentials": [{ "type": "password", "value": "password" }] },
-        { "username": "player10", "enabled": true, "firstName": "Player", "lastName": "Ten", "credentials": [{ "type": "password", "value": "password" }] }
+        {
+            "username": "player1",
+            "enabled": true,
+            "firstName": "Player",
+            "lastName": "One",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password"
+                }
+            ]
+        },
+        {
+            "username": "player2",
+            "enabled": true,
+            "firstName": "Player",
+            "lastName": "Two",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password"
+                }
+            ]
+        },
+        {
+            "username": "player3",
+            "enabled": true,
+            "firstName": "Player",
+            "lastName": "Three",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password"
+                }
+            ]
+        },
+        {
+            "username": "player4",
+            "enabled": true,
+            "firstName": "Player",
+            "lastName": "Four",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password"
+                }
+            ]
+        },
+        {
+            "username": "player5",
+            "enabled": true,
+            "firstName": "Player",
+            "lastName": "Five",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password"
+                }
+            ]
+        },
+        {
+            "username": "player6",
+            "enabled": true,
+            "firstName": "Player",
+            "lastName": "Six",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password"
+                }
+            ]
+        },
+        {
+            "username": "player7",
+            "enabled": true,
+            "firstName": "Player",
+            "lastName": "Seven",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password"
+                }
+            ]
+        },
+        {
+            "username": "player8",
+            "enabled": true,
+            "firstName": "Player",
+            "lastName": "Eight",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password"
+                }
+            ]
+        },
+        {
+            "username": "player9",
+            "enabled": true,
+            "firstName": "Player",
+            "lastName": "Nine",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password"
+                }
+            ]
+        },
+        {
+            "username": "player10",
+            "enabled": true,
+            "firstName": "Player",
+            "lastName": "Ten",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "password"
+                }
+            ]
+        }
     ],
     "roles": {
         "realm": [

@@ -113,7 +113,7 @@ pub async fn xandzero_play(
     if req.used_power_up {
         if let Some(idx) = req.erase_index {
             // Check points (Cost: 50)
-            let user_points: i32 = sqlx::query_scalar("SELECT score FROM leaderboard WHERE user_id = $1")
+            let user_points: i32 = sqlx::query_scalar("SELECT score FROM leaderboard WHERE user_id = $1 AND game_name = 'xandzero'")
                 .bind(&user_id)
                 .fetch_one(&data.db)
                 .await
@@ -127,7 +127,7 @@ pub async fn xandzero_play(
 
                     // Update DB
                     let new_total = user_points - 50;
-                    let _ = sqlx::query("UPDATE leaderboard SET score = $1 WHERE user_id = $2")
+                    let _ = sqlx::query("UPDATE leaderboard SET score = $1 WHERE user_id = $2 AND game_name = 'xandzero'")
                         .bind(new_total)
                         .bind(&user_id)
                         .execute(&data.db)
@@ -135,7 +135,7 @@ pub async fn xandzero_play(
                     
                     // Update Redis (Valkey) immediately so leaderboard UI reflects deduction
                     if let Ok(mut con) = data.redis_client.get_async_connection().await {
-                        let _: Result<(), redis::RedisError> = con.zadd("leaderboard", &username, new_total).await;
+                        let _: Result<(), redis::RedisError> = con.zadd("leaderboard:xandzero", &username, new_total).await;
                     }
                 }
             } else {
@@ -222,9 +222,9 @@ pub async fn xandzero_play(
 
         // Update Leaderboard (Increment)
         let _ = sqlx::query(
-            "INSERT INTO leaderboard (user_id, username, score) 
-             VALUES ($1, $2, $3) 
-             ON CONFLICT (user_id) DO UPDATE SET score = leaderboard.score + $3"
+            "INSERT INTO leaderboard (user_id, game_name, username, score) 
+             VALUES ($1, 'xandzero', $2, $3) 
+             ON CONFLICT (user_id, game_name) DO UPDATE SET score = leaderboard.score + $3"
         )
         .bind(&user_id)
         .bind(&username)
@@ -233,14 +233,14 @@ pub async fn xandzero_play(
         .await;
 
         // Update Valkey
-        let total_score: i32 = sqlx::query_scalar("SELECT score FROM leaderboard WHERE user_id = $1")
+        let total_score: i32 = sqlx::query_scalar("SELECT score FROM leaderboard WHERE user_id = $1 AND game_name = 'xandzero'")
             .bind(&user_id)
             .fetch_one(&data.db)
             .await
             .unwrap_or(0);
 
         if let Ok(mut con) = data.redis_client.get_async_connection().await {
-            let _: Result<(), redis::RedisError> = con.zadd("leaderboard", &username, total_score).await;
+            let _: Result<(), redis::RedisError> = con.zadd("leaderboard:xandzero", &username, total_score).await;
         }
     }
 

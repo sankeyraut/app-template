@@ -3,10 +3,11 @@ import './App.css'
 import { useAuth } from "react-oidc-context";
 import Leaderboard from './Leaderboard';
 import XandZeroGame from './XandZeroGame';
+import GameCanvas from './GameCanvas';
 
 function App() {
   const auth = useAuth();
-  const [view, setView] = useState('hub'); // 'hub', 'xandzero', 'jokes'
+  const [view, setView] = useState('hub'); // 'hub', 'xandzero', 'jokes', 'dragon'
   const [joke, setJoke] = useState('');
   const [loadingJoke, setLoadingJoke] = useState(false);
   const [leaderboardKey, setLeaderboardKey] = useState(0);
@@ -45,6 +46,11 @@ function App() {
 
   const FeatureHub = () => (
     <div className="hub-grid animate-fade-in">
+      <div className="feature-card" onClick={() => setView('dragon')}>
+        <div className="card-icon">🐉</div>
+        <h3 className="card-title">Dragon Fireball</h3>
+        <p className="card-desc">Extinguish the fireballs before they burn the village!</p>
+      </div>
       <div className="feature-card" onClick={() => setView('xandzero')}>
         <div className="card-icon">🎮</div>
         <h3 className="card-title">X and Zero</h3>
@@ -118,6 +124,7 @@ function App() {
         ) : (
           <>
             {view === 'hub' && <FeatureHub />}
+            {view === 'dragon' && <GameCanvas auth={auth} onExit={() => setView('hub')} />}
             {view === 'xandzero' && <XandZeroGame auth={auth} onGameEnd={handleGameEnd} />}
             {view === 'jokes' && <JokesView />}
           </>

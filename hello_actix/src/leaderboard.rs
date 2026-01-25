@@ -8,6 +8,12 @@ use crate::{AppState, LeaderboardEntry, validate_token};
 #[derive(Serialize, Deserialize)]
 pub struct ScoreRequest {
     pub score: i32,
+    pub game_name: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct LeaderboardQuery {
+    pub game: Option<String>,
 }
 
 /// API endpoint to submit a player's latest score.
@@ -26,16 +32,19 @@ pub async fn submit_score(
     let user_id = claims.sub;
     let username = claims.preferred_username.or(claims.name).unwrap_or_else(|| "Anonymous".to_string());
     let new_score = score_req.score;
+    let game = score_req.game_name.clone().unwrap_or_else(|| "default".to_string());
+    let redis_key = format!("leaderboard:{}", game);
 
     // 1. Update PostgreSQL (High Score Logic)
     let result = sqlx::query(
-        "INSERT INTO leaderboard (user_id, username, score) 
-         VALUES ($1, $2, $3) 
-         ON CONFLICT (user_id) DO UPDATE 
+        "INSERT INTO leaderboard (user_id, game_name, username, score) 
+         VALUES ($1, $2, $3, $4) 
+         ON CONFLICT (user_id, game_name) DO UPDATE 
          SET score = EXCLUDED.score, username = EXCLUDED.username, updated_at = NOW() 
          WHERE leaderboard.score < EXCLUDED.score"
     )
     .bind(&user_id)
+    .bind(&game)
     .bind(&username)
     .bind(new_score)
     .execute(&data.db)
@@ -52,21 +61,27 @@ pub async fn submit_score(
     };
 
     // ZADD will update if score is different. 
-    let _: Result<(), redis::RedisError> = con.zadd("leaderboard", &username, new_score).await;
+    let _: Result<(), redis::RedisError> = con.zadd(&redis_key, &username, new_score).await;
 
     HttpResponse::Ok().body("Score submitted")
 }
 
 /// API endpoint to retrieve the current top 10 global leaderboard.
 #[actix_web::get("/leaderboard")]
-pub async fn get_leaderboard(data: web::Data<AppState>) -> impl Responder {
+pub async fn get_leaderboard(
+    data: web::Data<AppState>,
+    query: web::Query<LeaderboardQuery>,
+) -> impl Responder {
     let mut con = match data.redis_client.get_async_connection().await {
         Ok(con) => con,
         Err(e) => return HttpResponse::InternalServerError().body(format!("Redis error: {}", e)),
     };
 
+    let game = query.game.clone().unwrap_or_else(|| "default".to_string());
+    let redis_key = format!("leaderboard:{}", game);
+
     // Get top 10
-    let results: Vec<(String, i32)> = match con.zrevrange_withscores("leaderboard", 0, 9).await {
+    let results: Vec<(String, i32)> = match con.zrevrange_withscores(&redis_key, 0, 9).await {
         Ok(res) => res,
         Err(e) => return HttpResponse::InternalServerError().body(format!("Redis error: {}", e)),
     };
@@ -86,21 +101,27 @@ pub async fn get_leaderboard(data: web::Data<AppState>) -> impl Responder {
 
 /// API endpoint to retrieve the rank and score of the currently authenticated player.
 #[actix_web::get("/leaderboard/me")]
-pub async fn get_my_rank(data: web::Data<AppState>, auth: BearerAuth) -> impl Responder {
+pub async fn get_my_rank(
+    data: web::Data<AppState>, 
+    auth: BearerAuth,
+    query: web::Query<LeaderboardQuery>,
+) -> impl Responder {
     let claims = match validate_token(auth.token(), &data.oidc_jwks_uri).await {
         Ok(c) => c,
         Err(r) => return r,
     };
 
     let username = claims.preferred_username.or(claims.name).unwrap_or_else(|| "Anonymous".to_string());
+    let game = query.game.clone().unwrap_or_else(|| "default".to_string());
+    let redis_key = format!("leaderboard:{}", game);
 
     let mut con = match data.redis_client.get_async_connection().await {
         Ok(con) => con,
         Err(e) => return HttpResponse::InternalServerError().body(format!("Redis error: {}", e)),
     };
 
-    let score: Option<i32> = con.zscore("leaderboard", &username).await.ok();
-    let rank: Option<i64> = con.zrevrank("leaderboard", &username).await.ok();
+    let score: Option<i32> = con.zscore(&redis_key, &username).await.ok();
+    let rank: Option<i64> = con.zrevrank(&redis_key, &username).await.ok();
 
     match (score, rank) {
         (Some(s), Some(r)) => HttpResponse::Ok().json(LeaderboardEntry {
@@ -108,6 +129,6 @@ pub async fn get_my_rank(data: web::Data<AppState>, auth: BearerAuth) -> impl Re
             score: s,
             rank: Some(r + 1),
         }),
-        _ => HttpResponse::NotFound().body("User not found on leaderboard"),
+        _ => HttpResponse::Ok().json(serde_json::json!({ "not_found": true })),
     }
 }

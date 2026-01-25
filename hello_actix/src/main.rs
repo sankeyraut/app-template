@@ -1,4 +1,4 @@
-use actix_web::{get, web, App, HttpServer, Responder, HttpResponse};
+
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 use redis::AsyncCommands;
@@ -8,6 +8,13 @@ use actix_web_httpauth::extractors::bearer::BearerAuth;
 // use async_oidc_jwt_validator::IMValidator; // Removed
 use jsonwebtoken::{decode, decode_header, DecodingKey, Validation, Algorithm};
 use serde_json::Value;
+mod dragonballgame;
+
+use actix_web::{get, web, App, HttpRequest, HttpServer, Responder, HttpResponse, Error};
+use actix_ws::Message;
+use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use tokio::time::interval;
 
 mod xandzero;
 mod leaderboard;
@@ -159,8 +166,131 @@ pub async fn validate_token(token: &str, jwks_uri: &str) -> Result<Claims, HttpR
         .map_err(|e| HttpResponse::Unauthorized().body(format!("Invalid token: {:?}", e)))
 }
 
-// No longer needed here as they are moved to leaderboard.rs
 
+#[derive(Deserialize)]
+struct WsQuery {
+    token: String,
+}
+
+async fn dragon_socket(
+    req: HttpRequest, 
+    stream: web::Payload,
+    data: web::Data<AppState>,
+) -> Result<HttpResponse, Error> {
+    // 1. Manually Parse Query
+    let query_string = req.query_string();
+    let token = match serde_urlencoded::from_str::<WsQuery>(query_string) {
+        Ok(q) => q.token,
+        Err(_) => return Ok(HttpResponse::Unauthorized().body("Missing or invalid token")),
+    };
+
+    // 2. Validate Token
+    let claims = match validate_token(&token, &data.oidc_jwks_uri).await {
+        Ok(c) => c,
+        Err(_) => return Ok(HttpResponse::Unauthorized().finish()),
+    };
+
+    let user_id = claims.sub.clone();
+    let username = claims.preferred_username.or(claims.name).unwrap_or_else(|| "Anonymous".to_string());
+    
+    let (res, mut session, mut msg_stream) = actix_ws::handle(&req, stream)?;
+
+    let game_state = Arc::new(Mutex::new(dragonballgame::GameState::new()));
+    let game_state_clone = game_state.clone();
+    let mut session_clone = session.clone();
+    let db_pool = data.db.clone();
+    let redis_client = data.redis_client.clone();
+
+    // 2. Input Handler Task (Client -> Server)
+    actix_web::rt::spawn(async move {
+        while let Some(Ok(msg)) = futures_util::StreamExt::next(&mut msg_stream).await {
+            match msg {
+                Message::Text(text) => {
+                    if let Ok(player_input) = serde_json::from_str::<dragonballgame::Player>(&text) {
+                        if let Ok(mut state) = game_state.lock() {
+                            state.update_player_pos(player_input.y);
+                        }
+                    }
+                }
+                Message::Ping(bytes) => {
+                    if session.pong(&bytes).await.is_err() {
+                        break;
+                    }
+                }
+                Message::Close(_) => break,
+                _ => {}
+            }
+        }
+    });
+
+    // 3. Game Loop Task (Server -> Client)
+    actix_web::rt::spawn(async move {
+        let mut ticker = interval(Duration::from_millis(16)); // ~60 FPS
+        let mut score_saved = false;
+
+        loop {
+            ticker.tick().await;
+
+            let (state_json, game_over, score) = {
+                let mut state = game_state_clone.lock().unwrap();
+                state.tick();
+                (serde_json::to_string(&*state).unwrap(), state.game_over, state.score)
+            };
+
+            // Check for Game Over Persistence
+            if game_over && !score_saved {
+                // Save Score
+                score_saved = true;
+                
+                // Update DB
+                let _ = sqlx::query(
+                    "INSERT INTO leaderboard (user_id, game_name, username, score) 
+                     VALUES ($1, 'dragonball', $2, $3) 
+                     ON CONFLICT (user_id, game_name) DO UPDATE SET score = GREATEST(leaderboard.score, $3)"
+                )
+                .bind(&user_id)
+                .bind(&username)
+                .bind(score as i32)
+                .execute(&db_pool)
+                .await; // Note: In a real app, handle error logging
+
+                // Update Redis
+                if let Ok(mut con) = redis_client.get_async_connection().await {
+                   // We want to store the BEST score in leaderboard, usually. 
+                   // But ZADD just updates. So we should probably check if new score is higher?
+                   // Redis ZADD updates if score is different.
+                   // Logic: Fetch best from DB or Redis? 
+                   // For this simple game, let's just push the latest score if it depends on "high score" semantics.
+                   // But if I play twice and get lower score, I shouldn't overwrite high score in Redis?
+                   // The SQL query used GREATEST.
+                   // Let's use ZADD GT (Greater Than) if supported, or just trust the DB flow?
+                   // Let's re-fetch the max score from DB to be safe and consistent.
+                    let best_score: i32 = sqlx::query_scalar("SELECT score FROM leaderboard WHERE user_id = $1 AND game_name = 'dragonball'")
+                        .bind(&user_id)
+                        .fetch_one(&db_pool)
+                        .await
+                        .unwrap_or(score as i32);
+
+                    let _: Result<(), redis::RedisError> = con.zadd("leaderboard:dragonball", &username, best_score).await;
+                }
+            }
+
+            if session_clone.text(state_json).await.is_err() {
+                break;
+            }
+            
+            if game_over && score_saved {
+                 // Game is over and saved. We can stop the loop or keep sending end state?
+                 // Usually keep sending so client sees "Game Over" screen.
+                 // But we don't need to tick logic anymore.
+                 // Just continue to render static state or break if we want to close connection?
+                 // Let's continue so client can see the screen.
+            }
+        }
+    });
+
+    Ok(res)
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -198,6 +328,7 @@ async fn main() -> std::io::Result<()> {
             .service(leaderboard::get_leaderboard)
             .service(leaderboard::get_my_rank)
             .service(xandzero::xandzero_play)
+            .route("/dragon_ws", web::get().to(dragon_socket))
     })
     .bind(("0.0.0.0", 9876))?
     .run()

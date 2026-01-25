@@ -14,5 +14,8 @@ dotenv = "0.15"
 actix-web-httpauth = "0.8"
 jsonwebtoken = "9"
 reqwest = { version = "0.12", features = ["json"] }
-tokio = { version = "1", features = ["full"] }
+actix-ws = "0.2.5"
+tokio = { version = "1", features = ["full", "sync"] }
+futures-util = "0.3"
+serde_urlencoded = "0.7"
 
